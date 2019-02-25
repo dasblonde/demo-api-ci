@@ -1,0 +1,62 @@
+FROM microsoft/dotnet:2.1-aspnetcore-runtime-alpine AS base
+
+RUN adduser -h /app -s /bin/nolog -u 1000 -D appuser
+RUN sed -i -r 's/^appuser:!:/appuser:x:/' /etc/shadow
+
+RUN sed -i -r '/^(appuser|root)/!d' /etc/group
+RUN sed -i -r '/^(appuser|root)/!d' /etc/passwd
+RUN sed -i -r '/^(appuser|root)/!d' /etc/shadow
+
+RUN sed -i -r '/^appuser:/! s#^(.*):[^:]*$#\1:/sbin/nologin#' /etc/passwd
+
+WORKDIR /app
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://*:8080
+
+FROM microsoft/dotnet:2.1-sdk AS build
+WORKDIR /src
+COPY src/WebApi/WebApi.csproj src/WebApi/
+RUN dotnet restore src/WebApi/WebApi.csproj
+COPY . .
+WORKDIR /src/src/WebApi
+RUN dotnet build WebApi.csproj -c Release -o /app
+
+FROM build AS publish
+RUN dotnet publish WebApi.csproj -c Release -o /app
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app .
+
+RUN find /bin -xdev -type d -exec chown root:root {} \; -exec chmod 0755 {} \;
+RUN find /bin -xdev -type l -exec test ! -e {} \; -delete
+
+RUN find /etc -xdev -type d -exec chown root:root {} \; -exec chmod 0755 {} \;
+RUN find /etc -xdev -type l -exec test ! -e {} \; -delete
+
+RUN find /lib -xdev -type d -exec chown root:root {} \; -exec chmod 0755 {} \;
+RUN find /lib -xdev -type l -exec test ! -e {} \; -delete
+
+RUN find /sbin -xdev -type d -exec chown root:root {} \; -exec chmod 0755 {} \;
+RUN find /sbin -xdev -type l -exec test ! -e {} \; -delete
+
+RUN find /usr -xdev -type d -exec chown root:root {} \; -exec chmod 0755 {} \;
+RUN find /usr -xdev -type l -exec test ! -e {} \; -delete
+
+RUN find /sbin /usr/sbin ! -type d -a ! -name nologin -a ! -name dotnet -delete
+
+RUN find /bin /usr/bin ! -type d \
+    -a ! -name cd \
+    -a ! -name ls \
+    -a ! -name sh \
+    -a ! -name bash \
+    -a ! -name dir \
+    -a ! -name rm \
+    -a ! -name dotnet \
+    -a ! -name find \
+    -a ! -name test \
+    -delete
+
+USER appuser
+
+ENTRYPOINT ["dotnet", "WebApi.dll"]
