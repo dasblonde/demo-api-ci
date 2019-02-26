@@ -16,6 +16,7 @@ namespace WebApi.Controllers
         [HttpGet]
         public IEnumerable<SessionModel> Index()
         {
+            //comment goes here
             var allText =
                 System.IO.File.ReadAllText(Path.Combine(PlatformServices.Default.Application.ApplicationBasePath,
                     "data/sessions.json"));
